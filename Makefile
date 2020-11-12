@@ -1,5 +1,5 @@
 build:
-	go build -mod=vendor -ldflags "-X k8s.io/client-go/pkg/version.gitCommit=$$(git rev-parse HEAD) -X k8s.io/client-go/pkg/version.gitVersion=v1.0.0+$$(git rev-parse --short=7 HEAD)" -o bin/insights-operator ./cmd/insights-operator
+	go build -trimpath -mod=vendor -ldflags "-X k8s.io/client-go/pkg/version.gitCommit=$$(git rev-parse HEAD) -X k8s.io/client-go/pkg/version.gitVersion=v1.0.0+$$(git rev-parse --short=7 HEAD)" -o bin/insights-operator ./cmd/insights-operator
 
 .PHONY: build
 
@@ -27,3 +27,7 @@ vendor:
 	go mod vendor
 	go mod verify
 .PHONY: vendor
+
+build-plugin:
+	go build -trimpath -mod=vendor -buildmode=plugin -ldflags "-X k8s.io/client-go/pkg/version.gitCommit=$$(git rev-parse HEAD) -X k8s.io/client-go/pkg/version.gitVersion=v1.0.0+$$(git rev-parse --short=7 HEAD)" -o bin/container_runtime_configs.so ./pkg/plugins/container_runtime_configs/gather.go
+	go build -trimpath -mod=vendor -buildmode=plugin -ldflags "-X k8s.io/client-go/pkg/version.gitCommit=$$(git rev-parse HEAD) -X k8s.io/client-go/pkg/version.gitVersion=v1.0.0+$$(git rev-parse --short=7 HEAD)" -o bin/pod_disruption_budgets.so ./pkg/plugins/pod_disruption_budgets/gather.go

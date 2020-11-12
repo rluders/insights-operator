@@ -49,7 +49,7 @@ func (m JSONMarshaller) GetExtension() string {
 }
 
 // Collect is a helper for gathering a large set of records from generic functions.
-func Collect(ctx context.Context, recorder Interface, bulkFns ...func() ([]Record, []error)) error {
+func Collect(ctx context.Context, recorder Interface, bulkFns []func() ([]Record, []error)) error {
 	var errors []string
 	for _, bulkFn := range bulkFns {
 		klog.V(5).Infof("Gathering %s", runtime.FuncForPC(reflect.ValueOf(bulkFn).Pointer()).Name())
