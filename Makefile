@@ -81,6 +81,12 @@ run: ## Executes the insights operator
 		--config=$(CONFIG) \
 		$(RUN_FLAGS)
 
+.PHONY: processor
+processor: ## Executes the insights operator processor
+	go run ./cmd/insights-operator/main.go processor \
+		--config=$(CONFIG) \
+		$(RUN_FLAGS)
+
 .PHONY: build
 build: ## Compiles the insights operator
 	go build -o ./bin/insights-operator ./cmd/insights-operator

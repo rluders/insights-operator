@@ -20,18 +20,14 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/openshift/insights-operator/pkg/anonymization"
-	"github.com/openshift/insights-operator/pkg/authorizer/clusterauthorizer"
 	"github.com/openshift/insights-operator/pkg/config"
 	"github.com/openshift/insights-operator/pkg/config/configobserver"
 	"github.com/openshift/insights-operator/pkg/controller/periodic"
 	"github.com/openshift/insights-operator/pkg/controller/status"
 	"github.com/openshift/insights-operator/pkg/gather"
 	"github.com/openshift/insights-operator/pkg/gather/clusterconfig"
-	"github.com/openshift/insights-operator/pkg/insights/insightsclient"
-	"github.com/openshift/insights-operator/pkg/insights/insightsreport"
-	"github.com/openshift/insights-operator/pkg/insights/insightsuploader"
 	"github.com/openshift/insights-operator/pkg/recorder"
-	"github.com/openshift/insights-operator/pkg/recorder/diskrecorder"
+	"github.com/openshift/insights-operator/pkg/recorder/kafkarecorder"
 )
 
 // Object responsible for controlling the start up of the Insights Operator
@@ -116,7 +112,8 @@ func (s *Operator) Run(ctx context.Context, controller *controllercmd.Controller
 
 	// the recorder periodically flushes any recorded data to disk as tar.gz files
 	// in s.StoragePath, and also prunes files above a certain age
-	recdriver := diskrecorder.New(s.StoragePath)
+	// recdriver := diskrecorder.New(s.StoragePath)
+	recdriver := kafkarecorder.New("192.168.1.34", "gather")
 	rec := recorder.New(recdriver, s.Interval, anonymizer)
 	go rec.PeriodicallyPrune(ctx, statusReporter)
 
@@ -141,13 +138,13 @@ func (s *Operator) Run(ctx context.Context, controller *controllercmd.Controller
 	}
 	go periodicGather.Run(ctx.Done(), initialDelay)
 
-	authorizer := clusterauthorizer.New(configObserver)
-	insightsClient := insightsclient.New(nil, 0, "default", authorizer, gatherKubeConfig)
+	// authorizer := clusterauthorizer.New(configObserver)
+	// insightsClient := insightsclient.New(nil, 0, "default", authorizer, gatherKubeConfig)
 
 	// upload results to the provided client - if no client is configured reporting
 	// is permanently disabled, but if a client does exist the server may still disable reporting
-	uploader := insightsuploader.New(recdriver, insightsClient, configObserver, statusReporter, initialDelay)
-	statusReporter.AddSources(uploader)
+	// uploader := insightsuploader.New(recdriver, insightsClient, configObserver, statusReporter, initialDelay)
+	// statusReporter.AddSources(uploader)
 
 	// TODO: future ideas
 	//
@@ -163,10 +160,10 @@ func (s *Operator) Run(ctx context.Context, controller *controllercmd.Controller
 	}
 	// start uploading status, so that we
 	// know any previous last reported time
-	go uploader.Run(ctx)
+	// go uploader.Run(ctx)
 
-	reportGatherer := insightsreport.New(insightsClient, configObserver, uploader)
-	go reportGatherer.Run(ctx)
+	// reportGatherer := insightsreport.New(insightsClient, configObserver, uploader)
+	// go reportGatherer.Run(ctx)
 
 	klog.Warning("stopped")
 

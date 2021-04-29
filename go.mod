@@ -3,6 +3,7 @@ module github.com/openshift/insights-operator
 go 1.16
 
 require (
+	github.com/confluentinc/confluent-kafka-go v1.6.1
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.1.0 // indirect

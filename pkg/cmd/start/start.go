@@ -65,6 +65,29 @@ func NewGather() *cobra.Command {
 	return cmd
 }
 
+func NewProcessor() *cobra.Command {
+	processor := &controller.Processor{
+		Controller: config.Controller{
+			StoragePath:          "/var/lib/insights-operator",
+			Interval:             10 * time.Minute,
+			Endpoint:             "https://cloud.redhat.com/api/ingress/v1/upload",
+			ReportEndpoint:       "https://cloud.redhat.com/api/insights-results-aggregator/v1/clusters/%s/report",
+			ReportPullingDelay:   60 * time.Second,
+			ReportMinRetryTime:   10 * time.Second,
+			ReportPullingTimeout: 30 * time.Minute,
+		},
+	}
+	cfg := controllercmd.NewControllerCommandConfig("openshift-insights-operator", version.Get(), nil)
+	cmd := &cobra.Command{
+		Use:   "processor",
+		Short: "Executes the gather processor",
+		Run:   runProcessor(processor, cfg),
+	}
+	cmd.Flags().AddFlagSet(cfg.NewCommand().Flags())
+
+	return cmd
+}
+
 // Starts a single gather, main responsibility is loading in the necessary configs.
 func runGather(operator *controller.GatherJob, cfg *controllercmd.ControllerCommandConfig) func(cmd *cobra.Command, args []string) {
 	return func(cmd *cobra.Command, args []string) {
@@ -162,6 +185,61 @@ func runOperator(operator *controller.Operator, cfg *controllercmd.ControllerCom
 			WithKubeConfigFile(cmd.Flags().Lookup("kubeconfig").Value.String(), nil).
 			WithLeaderElection(operatorConfig.LeaderElection, "", "openshift-insights-operator-lock").
 			WithServer(operatorConfig.ServingInfo, operatorConfig.Authentication, operatorConfig.Authorization).
+			WithRestartOnChange(exitOnChangeReactorCh, startingFileContent, observedFiles...)
+		if err := builder.Run(ctx2, unstructured); err != nil {
+			klog.Fatal(err)
+		}
+	}
+}
+
+func runProcessor(processor *controller.Processor, cfg *controllercmd.ControllerCommandConfig) func(cmd *cobra.Command, args []string) {
+	return func(cmd *cobra.Command, args []string) {
+		// boiler plate for the "normal" command
+		rand.Seed(time.Now().UTC().UnixNano())
+		defer serviceability.BehaviorOnPanic(os.Getenv("OPENSHIFT_ON_PANIC"), version.Get())()
+		defer serviceability.Profile(os.Getenv("OPENSHIFT_PROFILE")).Stop()
+		serviceability.StartProfiler()
+
+		if config := cmd.Flags().Lookup("config").Value.String(); len(config) == 0 {
+			klog.Fatalf("error: --config is required")
+		}
+
+		unstructured, config, configBytes, err := cfg.Config()
+		if err != nil {
+			klog.Fatal(err)
+		}
+
+		startingFileContent, observedFiles, err := cfg.AddDefaultRotationToConfig(config, configBytes)
+		if err != nil {
+			klog.Fatal(err)
+		}
+
+		// if the service CA is rotated, we want to restart
+		if data, err := ioutil.ReadFile(serviceCACertPath); err == nil {
+			startingFileContent[serviceCACertPath] = data
+		} else {
+			klog.V(4).Infof("Unable to read service ca bundle: %v", err)
+		}
+		observedFiles = append(observedFiles, serviceCACertPath)
+
+		exitOnChangeReactorCh := make(chan struct{})
+		ctx := context.Background()
+		ctx2, cancel := context.WithCancel(ctx)
+		go func() {
+			select {
+			case <-exitOnChangeReactorCh:
+				cancel()
+			case <-ctx.Done():
+				cancel()
+			}
+		}()
+
+		config.ServingInfo.BindAddress = "0.0.0.0:8444"
+
+		builder := controllercmd.NewController("openshift-insights-operator-processor", processor.Run).
+			WithKubeConfigFile(cmd.Flags().Lookup("kubeconfig").Value.String(), nil).
+			WithLeaderElection(config.LeaderElection, "", "openshift-insights-operator-processor-lock").
+			WithServer(config.ServingInfo, config.Authentication, config.Authorization).
 			WithRestartOnChange(exitOnChangeReactorCh, startingFileContent, observedFiles...)
 		if err := builder.Run(ctx2, unstructured); err != nil {
 			klog.Fatal(err)
