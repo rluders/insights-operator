@@ -76,26 +76,36 @@ func (s *Processor) Run(ctx context.Context, controller *controllercmd.Controlle
 	// go configObserver.Start(ctx)
 
 	// Kafka
-	c, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "192.168.1.34",
-		"group.id":          "myGroup",
-		"auto.offset.reset": "earliest",
-	})
-	if err != nil {
-		panic(err)
-	}
+	go func() {
 
-	c.SubscribeTopics([]string{"gather", "^aRegex.*[gG]ather"}, nil)
-
-	for {
-		msg, err := c.ReadMessage(-1)
-		if err == nil {
-			klog.V(2).Infof("Message on %s: %s\n", msg.TopicPartition, string(msg.Value))
-		} else {
-			// The client will automatically try to recover from all errors.
-			klog.V(2).Infof("Consumer error: %v (%v)\n", err, msg)
+		c, err := kafka.NewConsumer(&kafka.ConfigMap{
+			"bootstrap.servers": "192.168.1.34",
+			"group.id":          "myGroup",
+			"auto.offset.reset": "earliest",
+		})
+		if err != nil {
+			panic(err)
 		}
-	}
+
+		c.SubscribeTopics([]string{"gather", "^aRegex.*[gG]ather"}, nil)
+
+		for {
+			select {
+			case <-ctx.Done():
+				c.Close()
+				return
+			default:
+				msg, err := c.ReadMessage(-1)
+				if err == nil {
+					klog.V(2).Infof("Message on %s: %s\n", msg.TopicPartition, string(msg.Value))
+				} else {
+					// The client will automatically try to recover from all errors.
+					klog.V(2).Infof("Consumer error: %v (%v)\n", err, msg)
+				}
+			}
+		}
+
+	}()
 
 	klog.Warning("stopped")
 
