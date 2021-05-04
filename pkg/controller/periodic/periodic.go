@@ -15,6 +15,7 @@ import (
 	"github.com/openshift/insights-operator/pkg/controller/status"
 	"github.com/openshift/insights-operator/pkg/controllerstatus"
 	"github.com/openshift/insights-operator/pkg/gather"
+	gtrs "github.com/openshift/insights-operator/pkg/gatherers"
 	"github.com/openshift/insights-operator/pkg/recorder"
 )
 
@@ -23,7 +24,7 @@ import (
 type Controller struct {
 	configurator configobserver.Configurator
 	recorder     recorder.FlushInterface
-	gatherers    []gather.Interface
+	gatherers    []gtrs.Interface
 	statuses     map[string]*controllerstatus.Simple
 	anonymizer   *anonymization.Anonymizer
 }
@@ -33,7 +34,7 @@ type Controller struct {
 func New(
 	configurator configobserver.Configurator,
 	rec recorder.FlushInterface,
-	gatherers []gather.Interface,
+	gatherers []gtrs.Interface,
 	anonymizer *anonymization.Anonymizer,
 ) *Controller {
 	statuses := make(map[string]*controllerstatus.Simple)
@@ -114,10 +115,10 @@ func (c *Controller) Gather() {
 		}
 	}()
 
-	var gatherersToProcess []gather.Interface
+	var gatherersToProcess []gtrs.Interface
 
 	for _, gatherer := range c.gatherers {
-		if g, ok := gatherer.(gather.CustomPeriodGatherer); ok {
+		if g, ok := gatherer.(gtrs.CustomPeriodGatherer); ok {
 			if g.ShouldBeProcessedNow() {
 				gatherersToProcess = append(gatherersToProcess, g)
 				g.UpdateLastProcessingTime()
