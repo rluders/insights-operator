@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func getMemoryRecords() record.MemoryRecords {
+func getMemoryRecords(m int) record.MemoryRecords {
 	var records record.MemoryRecords
-	for i := range []int{1, 2, 3} {
+	for i := 0; i < m; i++ {
 		records = append(records, record.MemoryRecord{
 			Name: fmt.Sprintf("config/mock%d", i),
 			At:   time.Now(),
@@ -28,7 +28,7 @@ func newDiskRecorder() DiskRecorder {
 
 func Test_Diskrecorder_Save(t *testing.T) {
 	dr := newDiskRecorder()
-	records := getMemoryRecords()
+	records := getMemoryRecords(3)
 	saved, err := dr.Save(records)
 	assert.Nil(t, err)
 	assert.Len(t, saved, len(records))
@@ -36,7 +36,7 @@ func Test_Diskrecorder_Save(t *testing.T) {
 
 func Test_Diskrecorder_SaveInvalidPath(t *testing.T) {
 	dr := DiskRecorder{basePath: "/tmp/this-path-not-exists"}
-	records := getMemoryRecords()
+	records := getMemoryRecords(3)
 	saved, err := dr.Save(records)
 	assert.Error(t, err)
 	assert.Nil(t, saved)
@@ -74,4 +74,13 @@ func Test_Diskrecorder_Prune(t *testing.T) {
 	dr := newDiskRecorder()
 	err := dr.Prune(olderThan)
 	assert.Nil(t, err)
+}
+
+func Benchmark_DiskRecorder(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		dr := newDiskRecorder()
+		records := getMemoryRecords(1000)
+		dr.Save(records)
+		dr.Prune(time.Now())
+	}
 }
